@@ -1,0 +1,14 @@
+﻿CACH DUA LEN GITHUB (24/7, khong can bat may tinh)
+
+1. Vao github.com -> New repository (Public)
+2. Add file -> Upload files
+3. Keo TAT CA file trong thu muc nay len (index.html, 404.html, WebStudio.apk, .nojekyll, public/)
+4. Commit
+5. Settings -> Pages
+   - Source: Deploy from a branch
+   - Branch: main
+   - Folder: / (root)
+   - Save
+6. Doi 1-2 phut, mo: https://TEN-BAN.github.io/TEN-REPO/
+
+Khong mo localhost:3000. Khong can bat may tinh sau khi Pages da xong.

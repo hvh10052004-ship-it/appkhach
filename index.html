@@ -1890,6 +1890,11 @@ body:has(.app-stage)::after {
 .app-chat-bubble.bot { align-self: flex-start; background: var(--app-soft); }
 .app-chat-form { display: flex; gap: 8px; }
 .app-chat-form input { flex: 1; border: 1px solid var(--app-line); border-radius: 999px; padding: 10px 14px; background: var(--app-card); color: var(--app-fg); font: inherit; }
+button.app-soan-item, button.app-settings-row, button.app-settings-head-link {
+  width: 100%; text-align: left; border: 0; background: transparent; font: inherit; color: inherit; cursor: pointer;
+}
+button.app-soan-item { display: flex; align-items: center; gap: 12px; }
+button.app-soan-item.is-locked { pointer-events: auto; }
   </style>
 </head>
 <body>
@@ -1976,6 +1981,8 @@ function load() {
       phone: raw.phone || "",
       theme: raw.theme === "dark" ? "dark" : "light",
       userName: raw.userName || "Khách",
+      birthday: raw.birthday || "",
+      savedTypes: raw.savedTypes && typeof raw.savedTypes === "object" ? raw.savedTypes : {},
       messages: Array.isArray(raw.messages) ? raw.messages : [
         { who: "bot", text: "Chào bạn. App khách đang chạy trên GitHub Pages — soạn nội dung và xem ngay trên điện thoại." }
       ]
@@ -2015,10 +2022,22 @@ function progress() {
   const list = checks();
   return list.length ? Math.round((list.filter((c) => c.done).length / list.length) * 100) : 0;
 }
-function page() {
+const SEED = {
+  landing: { headline: "Da hết mụn, sáng mịn 14 ngày — cho da dầu, không kích ứng.", lead: "AURA Glow Essence 30ml: niacinamide 5% + peptide.", price: "449.000đ", cta: "Mua ngay", phone: "0900000000", b1: "COD — trả khi nhận", b2: "Freeship toàn quốc", b3: "Đổi trả 7 ngày", quote: "Dùng 10 ngày mụn ẩn giảm rõ, không khô da.", author: "Minh Anh, 26 tuổi" },
+  company: { headline: "Nova Legal", lead: "Tư vấn pháp lý cho doanh nghiệp vừa và nhỏ.", price: "", cta: "Nhận tư vấn", phone: "0900000000", b1: "Tư vấn hợp đồng", b2: "Lao động — nhân sự", b3: "Tranh chấp dân sự", quote: "Đội ngũ luật sư đồng hành cùng SME.", author: "Thành lập 2018" },
+  saas: { headline: "Hiểu khách hàng chỉ trong 1 bảng.", lead: "Pulse Analytics — dashboard realtime cho startup.", price: "199.000đ/tháng", cta: "Dùng thử", phone: "0900000000", b1: "Báo cáo tự động", b2: "Tích hợp Slack", b3: "Không cần SQL", quote: "Setup 10 phút, team sales dùng ngay.", author: "Lan, Growth" },
+  ecommerce: { headline: "Green Store", lead: "Rau củ hữu cơ, giao trong ngày.", price: "Từ 35.000đ", cta: "Đặt hàng COD", phone: "0900000000", b1: "Tươi trong ngày", b2: "COD toàn quốc", b3: "Đổi trả 24h", quote: "Rau ngon, đóng gói sạch.", author: "Hương, Q.7" }
+};
+const CHEV = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>';
+const SUB_TAB = { "soan-noidung": "soan", "xem-preview": "xem", "ho-so": "toi", "giao-dien": "toi", "quyen-rieng-tu": "toi", "tai-khoan": "toi", "nha-phat-trien": "toi", "gioi-thieu": "toi", "tai-apk": "toi" };
+function route() {
   const id = (location.hash || "#home").slice(1).split("?")[0] || "home";
-  return TABS.some((t) => t.id === id) ? id : "home";
+  if (TABS.some((t) => t.id === id)) return { view: id, tab: id };
+  return { view: SUB_TAB[id] ? id : "home", tab: SUB_TAB[id] || "home" };
 }
+function page() { return route().view; }
+function seed() { return SEED[state.typeId] || SEED.landing; }
+function val(key) { return state[key] || seed()[key] || ""; }
 function go(id) {
   location.hash = id;
 }
@@ -2067,8 +2086,8 @@ function renderHome() {
       <div class="app-progress-row"><span>Hoàn thiện nội dung</span><span>${pct}%</span></div>
       <div class="app-progress-track" aria-hidden><div class="app-progress-fill" style="width:${pct}%"></div></div>
       <div class="app-site-actions">
-        <button type="button" class="app-btn app-btn-ghost" data-go="xem">Xem trang</button>
-        <button type="button" class="app-btn app-btn-primary" data-go="soan">Tiếp tục soạn</button>
+        <button type="button" class="app-btn app-btn-ghost" data-go="xem-preview">Xem trang</button>
+        <button type="button" class="app-btn app-btn-primary" data-go="soan-noidung">Tiếp tục soạn</button>
       </div>
     </article>
     <div class="app-checks">
@@ -2101,14 +2120,33 @@ function renderMau() {
 
 function renderSoan() {
   return `
-    <header class="app-home-top"><div><h1>Soạn nội dung</h1><p>Lưu trên máy — chạy được trên GitHub</p></div></header>
-    <div class="app-compose-field"><label>Tên website</label><input id="f-name" value="${esc(state.name)}" placeholder="AURA Glow Essence" /></div>
-    <div class="app-compose-field"><label>Tiêu đề</label><textarea id="f-headline" placeholder="Da hết mụn, sáng mịn 14 ngày">${esc(state.headline)}</textarea></div>
-    <div class="app-compose-field"><label>Mô tả</label><textarea id="f-lead" placeholder="Tinh chất dưỡng đêm, thấm nhanh...">${esc(state.lead)}</textarea></div>
-    <div class="app-compose-field"><label>Giá</label><input id="f-price" value="${esc(state.price)}" placeholder="449.000đ" /></div>
-    <div class="app-compose-field"><label>Nút CTA</label><input id="f-cta" value="${esc(state.cta)}" placeholder="Mua ngay" /></div>
-    <div class="app-compose-field"><label>Số điện thoại / Zalo</label><input id="f-phone" value="${esc(state.phone)}" placeholder="0938 002 776" /></div>
-    <button type="button" class="app-btn app-btn-primary" id="saveDraft">Lưu bản nháp</button>`;
+    <header class="app-home-top"><div><h1>Soạn thông tin website</h1><p>Chọn loại website để bắt đầu — mỗi loại lưu riêng</p></div></header>
+    <ol class="app-soan-list">
+      ${SITE_TYPES.map((type, i) => `
+        <li>
+          <button type="button" class="app-soan-item" data-soan-type="${type.id}">
+            <span class="app-soan-idx">${i + 1}</span>
+            <div>
+              <strong>${esc(type.name)}</strong>
+              <p>${esc(type.blurb)}</p>
+            </div>
+          </button>
+        </li>`).join("")}
+    </ol>`;
+}
+
+function renderSoanNoidung() {
+  const type = typeInfo();
+  return `
+    <button type="button" class="app-back" data-go="soan">← Tất cả loại website</button>
+    <header class="app-home-top"><div><h1>Soạn ${esc(type.short)}</h1><p>Điền chữ, giá, SĐT rồi lưu</p></div></header>
+    <div class="app-compose-field"><label>Tên website</label><input id="f-name" value="${esc(state.name)}" placeholder="${esc(seed().headline)}" /></div>
+    <div class="app-compose-field"><label>Tiêu đề</label><textarea id="f-headline" placeholder="${esc(seed().headline)}">${esc(state.headline)}</textarea></div>
+    <div class="app-compose-field"><label>Mô tả</label><textarea id="f-lead" placeholder="${esc(seed().lead)}">${esc(state.lead)}</textarea></div>
+    <div class="app-compose-field"><label>Giá</label><input id="f-price" value="${esc(state.price)}" placeholder="${esc(seed().price)}" /></div>
+    <div class="app-compose-field"><label>Nút CTA</label><input id="f-cta" value="${esc(state.cta)}" placeholder="${esc(seed().cta)}" /></div>
+    <div class="app-compose-field"><label>Số điện thoại / Zalo</label><input id="f-phone" value="${esc(state.phone)}" placeholder="${esc(seed().phone)}" /></div>
+    <button type="button" class="app-btn app-btn-primary" id="saveDraft">Lưu thông tin</button>`;
 }
 
 function renderChat() {
@@ -2124,40 +2162,159 @@ function renderChat() {
 }
 
 function renderXem() {
-  const t = tpl();
-  const type = typeInfo();
   return `
-    <header class="app-home-top"><div><h1>Xem trang</h1><p>${esc(type.name)}</p></div></header>
-    <article class="app-preview-card">
-      <img src="${t.image}" alt="" />
-      <div class="app-preview-body">
-        <p class="app-meta">${esc(t.name)}</p>
-        <h2>${esc(state.headline || state.name || type.name)}</h2>
-        <p>${esc(state.lead || type.blurb)}</p>
-        <p class="app-preview-price">${esc(state.price || "Liên hệ")}</p>
-        <a class="app-btn app-btn-primary" href="tel:${esc(state.phone || "0938002776")}">${esc(state.cta || "Liên hệ ngay")}</a>
+    <header class="app-home-top"><div><h1>Xem trang</h1><p>Mỗi loại website là một trang riêng — hiện sau khi lưu thông tin</p></div></header>
+    <ol class="app-soan-list">
+      ${SITE_TYPES.map((type, i) => {
+        const saved = state.savedTypes && state.savedTypes[type.id];
+        return `
+        <li>
+          <button type="button" class="app-soan-item${saved ? "" : " is-locked"}" data-xem-type="${type.id}">
+            <span class="app-soan-idx">${i + 1}</span>
+            <div>
+              <strong>${esc(type.name)}</strong>
+              <p>${saved ? esc(saved) : "Chưa lưu — soạn rồi bấm Lưu thông tin"}</p>
+            </div>
+          </button>
+        </li>`;
+      }).join("")}
+    </ol>`;
+}
+
+function renderXemPreview() {
+  const type = typeInfo();
+  const t = tpl();
+  const s = seed();
+  const phone = val("phone");
+  return `
+    <button type="button" class="app-back" data-go="xem">← Tất cả loại website</button>
+    <header class="app-home-top"><div><h1>Xem trước</h1><p>${esc(type.name)} · ${esc(state.name || t.name)}</p></div></header>
+    <div class="app-preview">
+      <div class="app-preview-bar"><span></span><span></span><span></span></div>
+      <div class="app-preview-hero">
+        <small>${esc(type.name)}</small>
+        <h2>${esc(val("headline") || t.name)}</h2>
+        <p>${esc(val("lead"))}</p>
+        ${val("price") ? '<strong class="app-preview-price">' + esc(val("price")) + "</strong>" : ""}
+        <span class="app-preview-cta">${esc(val("cta"))}</span>
       </div>
-    </article>`;
+      <ul class="app-preview-benefits">
+        <li>${esc(s.b1)}</li>
+        <li>${esc(s.b2)}</li>
+        <li>${esc(s.b3)}</li>
+      </ul>
+      <blockquote class="app-preview-review">
+        <p>★★★★★ ${esc(s.quote)}</p>
+        <cite>${esc(s.author)}</cite>
+      </blockquote>
+      <div class="app-preview-cta-row">
+        <span>SĐT ${esc(phone)}</span>
+        <span>Zalo ${esc(phone)}</span>
+      </div>
+    </div>
+    <div class="app-site-actions is-center" style="margin-top:16px">
+      <button type="button" class="app-btn app-btn-dark" data-go="soan-noidung">Sửa thông tin</button>
+    </div>`;
 }
 
 function renderToi() {
   const letter = state.userName.slice(0, 1).toUpperCase();
+  const rows = [
+    ["ho-so", "Hồ sơ"],
+    ["giao-dien", "Giao diện"],
+    ["quyen-rieng-tu", "Quyền riêng tư"],
+    ["tai-khoan", "Tài khoản và bảo mật"],
+    ["nha-phat-trien", "Nhà phát triển"],
+    ["gioi-thieu", "Giới thiệu"],
+    ["tai-apk", "Tải ứng dụng"]
+  ];
   return `
     <div class="app-settings">
       <header class="app-settings-head">
-        <div class="app-settings-head-link">
+        <button type="button" class="app-settings-head-link" data-go="ho-so">
           <div class="app-settings-avatar">${esc(letter)}</div>
           <div class="app-settings-who">
             <strong>${esc(state.userName)}</strong>
             <span>${esc(state.name || typeInfo().name)} · GitHub</span>
           </div>
-        </div>
+        </button>
       </header>
-      <div class="app-compose-field"><label>Tên hiển thị</label><input id="f-user" value="${esc(state.userName)}" /></div>
-      <button type="button" class="app-btn app-btn-ghost" id="themeBtn">Giao diện: ${state.theme === "dark" ? "Tối" : "Sáng"}</button>
-      <a class="app-btn app-btn-primary" id="dlApk" href="WebStudio.apk" download="WebStudio.apk" style="margin-top:12px">Tải ứng dụng Android</a>
-      <p class="app-note" id="dlHint" style="margin-top:10px">File WebStudio.apk phải nằm cùng thư mục với trang này trên GitHub.</p>
+      <div class="app-settings-list">
+        ${rows.map(([id, label]) => `
+          <button type="button" class="app-settings-row" data-go="${id}">
+            <span>${esc(label)}</span>
+            ${CHEV}
+          </button>`).join("")}
+      </div>
+      ${state.openAppearance ? '<div class="app-theme-picks"><button type="button" class="app-theme-pick' + (state.theme === "light" ? " is-on" : "") + '" data-theme="light">Sáng</button><button type="button" class="app-theme-pick' + (state.theme === "dark" ? " is-on" : "") + '" data-theme="dark">Tối</button></div>' : ""}
     </div>`;
+}
+
+function renderGiaoDien() {
+  return `
+    <button type="button" class="app-back" data-go="toi">← Cài đặt</button>
+    <header class="app-home-top"><div><h1>Giao diện</h1><p>Sáng hoặc tối</p></div></header>
+    <div class="app-theme-picks">
+      <button type="button" class="app-theme-pick${state.theme === "light" ? " is-on" : ""}" data-theme="light">Sáng</button>
+      <button type="button" class="app-theme-pick${state.theme === "dark" ? " is-on" : ""}" data-theme="dark">Tối</button>
+    </div>`;
+}
+
+function renderHoSo() {
+  return `
+    <button type="button" class="app-back" data-go="toi">← Cài đặt</button>
+    <header class="app-home-top"><div><h1>Hồ sơ</h1><p>Biệt danh và tên hiển thị</p></div></header>
+    <div class="app-compose-field"><label>Tên hiển thị</label><input id="f-user" value="${esc(state.userName)}" /></div>
+    <div class="app-compose-field"><label>Ngày sinh</label><input id="f-birthday" type="date" value="${esc(state.birthday || "")}" /></div>
+    <button type="button" class="app-btn app-btn-primary" id="saveProfile">Lưu hồ sơ</button>
+    <p class="app-note" id="profileMsg"></p>`;
+}
+
+function renderQuyen() {
+  return `
+    <button type="button" class="app-back" data-go="toi">← Cài đặt</button>
+    <header class="app-home-top"><div><h1>Quyền riêng tư</h1><p>Dữ liệu lưu trên trình duyệt của bạn</p></div></header>
+    <div class="app-info-card"><strong>GitHub Pages</strong><p>Bản nháp, chat và hồ sơ được lưu localStorage trên máy/điện thoại. Không gửi lên máy chủ.</p></div>
+    <div class="app-nav-row is-in-card" data-go="ho-so"><span>Hồ sơ</span>${CHEV}</div>
+    <div class="app-nav-row is-in-card" data-go="tai-khoan"><span>Tài khoản</span>${CHEV}</div>`;
+}
+
+function renderTaiKhoan() {
+  return `
+    <button type="button" class="app-back" data-go="toi">← Cài đặt</button>
+    <header class="app-home-top"><div><h1>Tài khoản và bảo mật</h1><p>Bản GitHub không có đăng nhập máy chủ</p></div></header>
+    <div class="app-info-card"><p>Để dùng tài khoản, mật khẩu, email đầy đủ như bản trên máy, cần máy chủ Next.js. Bản GitHub chỉ lưu hồ sơ trên thiết bị.</p></div>
+    <div class="app-nav-row is-in-card" data-go="ho-so"><span>Thông tin hồ sơ</span>${CHEV}</div>`;
+}
+
+function renderDev() {
+  return `
+    <button type="button" class="app-back" data-go="toi">← Cài đặt</button>
+    <header class="app-home-top"><div><h1>Nhà phát triển</h1><p>WebStudio App khách</p></div></header>
+    <div class="app-info-card"><strong>Phiên bản GitHub Pages</strong><p>App tĩnh 24/7. Soạn / xem / chat lưu trên trình duyệt.</p></div>`;
+}
+
+function renderAbout() {
+  return `
+    <button type="button" class="app-back" data-go="toi">← Cài đặt</button>
+    <header class="app-home-top"><div><h1>Giới thiệu</h1><p>WebStudio — tạo website trên điện thoại</p></div></header>
+    <div class="app-info-card"><strong>WebStudio App</strong><p>Ứng dụng giúp bạn tự soạn Landing Page, website công ty, SaaS và web bán hàng ngay trên điện thoại.</p></div>
+    <p class="app-sec-label">Bạn làm được gì</p>
+    <ul class="app-info-list">
+      <li><strong>4 loại website</strong><span>Landing, công ty, SaaS, bán hàng</span></li>
+      <li><strong>Soạn theo khối</strong><span>Điền chữ, giá, SĐT/Zalo rồi lưu</span></li>
+      <li><strong>Xem trước</strong><span>Tab Xem hiện đúng loại bạn đã soạn</span></li>
+      <li><strong>Chat</strong><span>Tin nhắn lưu trên thiết bị</span></li>
+    </ul>
+    <p class="app-info-foot">Phiên bản 1.0 · © 2026 WebStudio</p>`;
+}
+
+function renderTaiApk() {
+  return `
+    <button type="button" class="app-back" data-go="toi">← Cài đặt</button>
+    <header class="app-home-top"><div><h1>Tải ứng dụng</h1><p>Cài WebStudio trên Android</p></div></header>
+    <a class="app-btn app-btn-primary" id="dlApk" href="WebStudio.apk" download="WebStudio.apk">Tải ứng dụng Android</a>
+    <p class="app-note" id="dlHint" style="margin-top:12px">File WebStudio.apk phải nằm cùng thư mục với index.html trên GitHub.</p>`;
 }
 
 function bind() {
@@ -2175,7 +2332,21 @@ function bind() {
     if (!found) return;
     state.templateId = found.id;
     state.typeId = found.type;
-    save(state); go("soan");
+    save(state); go("soan-noidung");
+  }));
+  document.querySelectorAll("[data-soan-type]").forEach((el) => el.addEventListener("click", () => {
+    state.typeId = el.dataset.soanType;
+    state.templateId = TYPE_TEMPLATE[state.typeId];
+    save(state); go("soan-noidung");
+  }));
+  document.querySelectorAll("[data-xem-type]").forEach((el) => el.addEventListener("click", () => {
+    state.typeId = el.dataset.xemType;
+    state.templateId = TYPE_TEMPLATE[state.typeId];
+    save(state); go("xem-preview");
+  }));
+  document.querySelectorAll("[data-theme]").forEach((el) => el.addEventListener("click", () => {
+    state.theme = el.dataset.theme;
+    save(state); render();
   }));
   const saveBtn = document.getElementById("saveDraft");
   if (saveBtn) saveBtn.onclick = () => {
@@ -2185,8 +2356,18 @@ function bind() {
     state.price = document.getElementById("f-price").value.trim();
     state.cta = document.getElementById("f-cta").value.trim();
     state.phone = document.getElementById("f-phone").value.trim();
+    state.savedTypes = state.savedTypes || {};
+    state.savedTypes[state.typeId] = state.name || typeInfo().name;
     save(state);
-    go("xem");
+    go("xem-preview");
+  };
+  const saveProfile = document.getElementById("saveProfile");
+  if (saveProfile) saveProfile.onclick = () => {
+    state.userName = document.getElementById("f-user").value.trim() || "Khách";
+    state.birthday = document.getElementById("f-birthday").value;
+    save(state);
+    const msg = document.getElementById("profileMsg");
+    if (msg) msg.textContent = "Đã lưu hồ sơ.";
   };
   const chatForm = document.getElementById("chatForm");
   if (chatForm) chatForm.onsubmit = (e) => {
@@ -2198,13 +2379,6 @@ function bind() {
     state.messages.push({ who: "bot", text: "Đã nhận. Nội dung được lưu trên GitHub Pages (trình duyệt của bạn)." });
     save(state); render();
   };
-  const themeBtn = document.getElementById("themeBtn");
-  if (themeBtn) themeBtn.onclick = () => {
-    state.theme = state.theme === "dark" ? "light" : "dark";
-    save(state); render();
-  };
-  const user = document.getElementById("f-user");
-  if (user) user.onchange = () => { state.userName = user.value.trim() || "Khách"; save(state); render(); };
   const apk = document.getElementById("dlApk");
   if (apk) {
     const url = resolveApkUrl();
@@ -2234,12 +2408,18 @@ function renderTabs(active) {
 }
 
 function render() {
-  const active = page();
+  const { view, tab } = route();
   document.getElementById("phone").dataset.theme = state.theme;
-  document.getElementById("phoneBody").className = "app-phone-body" + (active === "chat" ? " is-chat" : "");
-  const views = { home: renderHome, mau: renderMau, soan: renderSoan, chat: renderChat, xem: renderXem, toi: renderToi };
-  document.getElementById("phoneBody").innerHTML = views[active]();
-  renderTabs(active);
+  document.getElementById("phoneBody").className = "app-phone-body" + (view === "chat" ? " is-chat" : "");
+  const views = {
+    home: renderHome, mau: renderMau, soan: renderSoan, "soan-noidung": renderSoanNoidung,
+    chat: renderChat, xem: renderXem, "xem-preview": renderXemPreview,
+    toi: renderToi, "ho-so": renderHoSo, "giao-dien": renderGiaoDien,
+    "quyen-rieng-tu": renderQuyen, "tai-khoan": renderTaiKhoan,
+    "nha-phat-trien": renderDev, "gioi-thieu": renderAbout, "tai-apk": renderTaiApk
+  };
+  document.getElementById("phoneBody").innerHTML = (views[view] || renderHome)();
+  renderTabs(tab);
   bind();
 }
 
